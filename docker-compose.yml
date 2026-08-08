@@ -1,4 +1,3 @@
-
 x-airflow-common: &airflow-common
   image: apache/airflow:2.9.3
   environment:
@@ -8,6 +7,11 @@ x-airflow-common: &airflow-common
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
     _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USER}
     _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+    SOURCE_DB_HOST: ${SOURCE_DB_HOST}
+    SOURCE_DB_PORT: ${SOURCE_DB_PORT}
+    SOURCE_DB_NAME: ${SOURCE_DB_NAME}
+    SOURCE_DB_USER: ${SOURCE_DB_USER}
+    SOURCE_DB_PASSWORD: ${SOURCE_DB_PASSWORD}
   volumes:
     - ./dags:/opt/airflow/dags
     - ./dbt_project:/opt/airflow/dbt_project
