@@ -1,23 +1,20 @@
 """
-Stub DAG: проверка связи Airflow -> proxy-postgres.
+Stub DAG: проверка связи Airflow -> proxy-postgres через Airflow Connection.
 Подключается к таблице requests, читает несколько последних строк и пишет в лог.
 Это временная заглушка перед полноценным инкрементальным extraction DAG-ом.
 """
 from datetime import datetime, timedelta
 
-import psycopg2
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+
+POSTGRES_CONN_ID = "proxy_postgres"
 
 
 def read_sample_rows(**context):
-    conn = psycopg2.connect(
-        host="proxy-postgres",
-        port=5432,
-        dbname="proxydb",
-        user="proxy",
-        password="proxy",
-    )
+    hook = PostgresHook(postgres_conn_id=POSTGRES_CONN_ID)
+    conn = hook.get_conn()
     try:
         with conn.cursor() as cur:
             cur.execute(
@@ -50,9 +47,9 @@ default_args = {
 
 with DAG(
     dag_id="stub_extract_requests",
-    description="Stub: connect to proxy-postgres and log sample requests",
+    description="Stub: connect to proxy-postgres (via Airflow Connection) and log sample requests",
     default_args=default_args,
-    schedule=None,  # запускаем вручную, пока это заглушка
+    schedule=None,
     start_date=datetime(2026, 8, 1),
     catchup=False,
     tags=["stub", "extraction"],
