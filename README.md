@@ -38,7 +38,7 @@ The platform is designed to be **source-agnostic**: today it consumes telemetry 
 ## Features
 
 * 🌀 **Scheduled Extraction** — Airflow DAGs pull new telemetry from PostgreSQL on a schedule
-* 🔐 **Secure Credentials** — source DB access via encrypted Airflow Connections, not hardcoded secrets
+* 🔐 **Secure Credentials** — source DB and object storage access via encrypted Airflow Connections, not hardcoded secrets
 * 🗄️ **Raw Data Lake** — immutable Parquet archive in MinIO (S3-compatible), partitioned by date
 * 🔄 **dbt + DuckDB Transformations** — staging and marts layers built directly on top of Parquet
 * 🧪 **Data Quality Tests** — `not_null`, `unique`, `accepted_values`, and custom anomaly checks
@@ -107,12 +107,15 @@ docker compose down
 ```text
 data-platform/
 │
-├── dags/                    # Airflow DAGs
-│   └── stub_extract_requests.py
+├── dags/                                 # Airflow DAGs
+│   ├── raw_extract_requests.py           # incremental extraction -> Parquet -> MinIO (Raw layer)
+│   ├── incremental_extract_requests.py   # dev stub: validates interval-based filtering
+│   ├── stub_extract_requests.py          # dev stub: Postgres connectivity check
+│   └── stub_minio_roundtrip.py           # dev stub: MinIO connectivity check
 │
-├── dbt_project/              # dbt models (staging, marts, tests)
+├── dbt_project/                          # dbt models (staging, marts, tests)
 │
-├── docker/                   # supporting Docker configs
+├── docker/                               # supporting Docker configs
 │
 ├── docker-compose.yml
 ├── .env.example
@@ -156,8 +159,8 @@ Source --> Airflow
 **Pipeline flow:**
 
 1. Airflow triggers an extraction DAG on a schedule.
-2. The DAG connects to the source PostgreSQL (via an Airflow Connection) and pulls only new/changed rows since the last run.
-3. Extracted rows are written to MinIO as partitioned Parquet files (Raw layer).
+2. The DAG connects to the source PostgreSQL (via an Airflow Connection) and pulls only rows within the current `data_interval`.
+3. Extracted rows are written to MinIO as partitioned Parquet files (Raw layer), overwriting the file for that interval to guarantee idempotency.
 4. dbt runs on top of the Parquet files via DuckDB, building staging and marts models with tests.
 5. Metabase queries the marts layer and refreshes dashboards automatically.
 
@@ -167,20 +170,21 @@ Source --> Airflow
 
 **Currently implemented:**
 
-* ✅ Docker Compose stack: Airflow, MinIO, Metabase
+* ✅ Docker Compose stack: Airflow, MinIO, Metabase, with restart policies to survive daemon restarts
 * ✅ Network bridging between `data-platform` and the external KuFlow/PostgreSQL stack
-* ✅ Stub DAG verifying end-to-end connectivity to the source database
-* ✅ Source credentials stored as an encrypted Airflow Connection (no hardcoded secrets)
+* ✅ Source and MinIO credentials stored as encrypted Airflow Connections (no hardcoded secrets)
+* ✅ MinIO bucket (`data-lake`) provisioned for the Raw layer
+* ✅ Incremental extraction logic using Airflow's native `data_interval` (no separate checkpoint table needed)
+* ✅ Extracted data written as partitioned Parquet files (`year=/month=/day=`) to MinIO
+* ✅ Idempotent runs verified end-to-end: re-running the same interval overwrites the same file instead of duplicating it
 
 **Next milestones:**
 
-* [ ] MinIO bucket setup for the Raw layer
-* [ ] Incremental extraction logic (track last extracted `created_at` / `id`)
-* [ ] Writing extracted data as partitioned Parquet files
-* [ ] dbt project initialization (staging + marts models)
-* [ ] dbt tests for data quality
+* [ ] dbt project initialization (staging + marts models) reading Parquet via DuckDB
+* [ ] dbt tests for data quality (`not_null`, `unique`, `accepted_values`, anomaly checks)
 * [ ] Metabase dashboard with core metrics (total requests, p95 latency, error rate, traffic by upstream)
 * [ ] Retry policy and failure alerting for Airflow DAGs
+* [ ] Real `@daily` scheduling in production (currently tested via `airflow tasks test` against historical intervals)
 
 ---
 
