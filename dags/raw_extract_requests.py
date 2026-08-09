@@ -59,8 +59,10 @@ def extract_and_write_parquet(**context):
     buffer.seek(0)
 
     # 4. Формируем ключ файла — пока без партиций, один файл на интервал
-    interval_tag = data_interval_start.strftime("%Y-%m-%d")
-    s3_key = f"raw/requests_unpartitioned/{interval_tag}.parquet"
+    year = data_interval_start.strftime("%Y")
+    month = data_interval_start.strftime("%m")
+    day = data_interval_start.strftime("%d")
+    s3_key = f"raw/requests/year={year}/month={month}/day={day}/data.parquet"
 
     # 5. Пишем в MinIO с перезаписью — гарантирует идемпотентность:
     #    повторный запуск за тот же интервал перезапишет тот же файл.
