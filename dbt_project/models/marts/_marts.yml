@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: mart_traffic_by_hour
+    description: "Total request volume aggregated by hour."
+    columns:
+      - name: hour
+        data_tests:
+          - not_null
+      - name: total_requests
+        data_tests:
+          - not_null
+
+  - name: mart_latency_percentiles
+    description: "Latency percentiles (p50/p95/p99) aggregated by day."
+    columns:
+      - name: day
+        data_tests:
+          - not_null
+      - name: p50_duration_ms
+        data_tests:
+          - not_null
+
+  - name: mart_error_rate
+    description: "Error rate (share of non-2xx responses) aggregated by day."
+    columns:
+      - name: day
+        data_tests:
+          - not_null
+      - name: error_rate
+        data_tests:
+          - not_null
+
+  - name: mart_traffic_by_upstream
+    description: "Request volume and latency broken down by upstream server."
+    columns:
+      - name: upstream
+        data_tests:
+          - not_null

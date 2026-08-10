@@ -1,0 +1,41 @@
+version: 2
+
+models:
+  - name: stg_requests
+    description: "Cleaned, renamed 1:1 mirror of the raw requests data."
+    columns:
+      - name: request_id
+        description: "Primary key, unique per request."
+        data_tests:
+          - unique
+          - not_null
+
+      - name: http_method
+        description: "HTTP method of the request."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS', 'CONNECT']
+
+      - name: status_code
+        description: "HTTP status code returned by the upstream."
+        data_tests:
+          - not_null
+
+      - name: duration_ms
+        description: "Request duration in milliseconds. Must be non-negative."
+        data_tests:
+          - not_null
+          - non_negative
+
+      - name: response_size
+        description: "Response size in bytes. Must be non-negative."
+        data_tests:
+          - not_null
+          - non_negative
+
+      - name: requested_at
+        description: "Timestamp when the request was made."
+        data_tests:
+          - not_null
