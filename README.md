@@ -138,17 +138,21 @@ Airflow[Airflow<br/>Orchestration]
 Raw[(MinIO<br/>Raw Parquet)]
 Staging[dbt staging<br/>DuckDB]
 Marts[dbt marts<br/>DuckDB]
+MartsDB[(PostgreSQL<br/>marts-db)]
 BI[Metabase<br/>Dashboard]
 
 Airflow -->|incremental extract| Raw
 Raw --> Staging
 Staging --> Marts
-Marts --> BI
+Marts -->|export script| MartsDB
+MartsDB --> BI
 
 end
 
 Source --> Airflow
 ```
+
+**Note on the BI connection:** the architecture originally called for Metabase to query the DuckDB marts file directly. In practice, the community-maintained Metabase DuckDB driver proved unstable in this environment (dependency conflicts, a broken `motherduck_token` connection parameter). Rather than depend on a fragile third-party plugin, marts tables are exported from DuckDB into a small dedicated PostgreSQL instance (`marts-db`) after each `dbt run`, and Metabase connects to it via its official, first-party Postgres driver. DuckDB remains the transformation engine for staging/marts, as required; only the final BI-facing hop changed.
 
 **Why three layers?**
 
@@ -178,11 +182,13 @@ Source --> Airflow
 * ✅ Extracted data written as partitioned Parquet files (`year=/month=/day=`) to MinIO
 * ✅ Idempotent runs verified end-to-end: re-running the same interval overwrites the same file instead of duplicating it
 
+* ✅ dbt project with staging + marts models reading Parquet directly via DuckDB, with tests and generated docs
+* ✅ Marts exported from DuckDB into a dedicated PostgreSQL instance (`marts-db`) for stable BI access
+* ✅ Metabase dashboard ("Telemetry Overview") with 4 widgets: total requests, p95 latency, error rate, traffic by upstream
+
 **Next milestones:**
 
-* [ ] dbt project initialization (staging + marts models) reading Parquet via DuckDB
-* [ ] dbt tests for data quality (`not_null`, `unique`, `accepted_values`, anomaly checks)
-* [ ] Metabase dashboard with core metrics (total requests, p95 latency, error rate, traffic by upstream)
+* [ ] Automate `dbt run` + marts export as part of the Airflow DAG (currently run manually from the host) — required to satisfy the "zero manual action" definition of done
 * [ ] Retry policy and failure alerting for Airflow DAGs
 * [ ] Real `@daily` scheduling in production (currently tested via `airflow tasks test` against historical intervals)
 
