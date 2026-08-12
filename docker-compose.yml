@@ -36,6 +36,18 @@ services:
     volumes:
       - airflow_db_data:/var/lib/postgresql/data
 
+  marts-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${MARTS_DB_USER}
+      POSTGRES_PASSWORD: ${MARTS_DB_PASSWORD}
+      POSTGRES_DB: ${MARTS_DB_NAME}
+    ports:
+      - "5434:5432"
+    volumes:
+      - marts_db_data:/var/lib/postgresql/data
+
   airflow-init:
     <<: *airflow-common
     restart: "no"
@@ -92,6 +104,7 @@ volumes:
   airflow_logs:
   minio_data:
   metabase_data:
+  marts_db_data:
 
 networks:
   default:
