@@ -141,10 +141,11 @@ Marts[dbt marts<br/>DuckDB]
 MartsDB[(PostgreSQL<br/>marts-db)]
 BI[Metabase<br/>Dashboard]
 
-Airflow -->|incremental extract| Raw
+Airflow -->|1: incremental extract| Raw
 Raw --> Staging
 Staging --> Marts
-Marts -->|export script| MartsDB
+Airflow -->|2: dbt run + test| Marts
+Airflow -->|3: export| MartsDB
 MartsDB --> BI
 
 end
@@ -153,6 +154,8 @@ Source --> Airflow
 ```
 
 **Note on the BI connection:** the architecture originally called for Metabase to query the DuckDB marts file directly. In practice, the community-maintained Metabase DuckDB driver proved unstable in this environment (dependency conflicts, a broken `motherduck_token` connection parameter). Rather than depend on a fragile third-party plugin, marts tables are exported from DuckDB into a small dedicated PostgreSQL instance (`marts-db`) after each `dbt run`, and Metabase connects to it via its official, first-party Postgres driver. DuckDB remains the transformation engine for staging/marts, as required; only the final BI-facing hop changed.
+
+All three steps (extract, transform, export) run inside the Airflow scheduler container as tasks in a single DAG (`raw_extract_requests`), triggered automatically on the `@daily` schedule — no manual commands are required at any point.
 
 **Why three layers?**
 
@@ -185,12 +188,13 @@ Source --> Airflow
 * ✅ dbt project with staging + marts models reading Parquet directly via DuckDB, with tests and generated docs
 * ✅ Marts exported from DuckDB into a dedicated PostgreSQL instance (`marts-db`) for stable BI access
 * ✅ Metabase dashboard ("Telemetry Overview") with 4 widgets: total requests, p95 latency, error rate, traffic by upstream
+* ✅ Fully automated pipeline: the Airflow DAG runs `extract -> dbt run -> dbt test -> export to Postgres` end to end on a daily schedule, with zero manual steps
+* ✅ Verified real `@daily` scheduling in addition to manual triggers — the scheduler picks up and runs the DAG on its own
 
 **Next milestones:**
 
-* [ ] Automate `dbt run` + marts export as part of the Airflow DAG (currently run manually from the host) — required to satisfy the "zero manual action" definition of done
-* [ ] Retry policy and failure alerting for Airflow DAGs
-* [ ] Real `@daily` scheduling in production (currently tested via `airflow tasks test` against historical intervals)
+* [ ] Retry policy and failure alerting for Airflow DAGs (currently a single retry with no notification on failure)
+* [ ] Backfill / historical load strategy documentation (`catchup` behavior)
 
 ---
 
