@@ -1,16 +1,19 @@
 """
-Raw extraction DAG: инкрементально забирает requests за data_interval
-и сохраняет как Parquet в MinIO (Raw layer).
+Raw extraction DAG: инкрементально забирает requests за data_interval,
+сохраняет как Parquet в MinIO (Raw layer), затем прогоняет dbt
+(staging + marts models с тестами) и экспортирует marts в PostgreSQL
+для стабильного доступа из Metabase.
 
-Шаг 1 из финальной версии: без партиционирования, один файл на интервал,
-с перезаписью (replace=True) для идемпотентности при повторном запуске.
-Партиционирование по дате будет добавлено следующим шагом.
+Идемпотентность: повторный запуск за тот же data_interval перезаписывает
+тот же Parquet-файл (replace=True) и полностью пересобирает marts-таблицы
+(dbt table materialization + to_sql if_exists="replace") — никаких дублей.
 """
 import io
 from datetime import datetime, timedelta
 
 import pandas as pd
 from airflow import DAG
+from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
@@ -18,6 +21,7 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 POSTGRES_CONN_ID = "proxy_postgres"
 S3_CONN_ID = "minio_s3"
 BUCKET_NAME = "data-lake"
+DBT_PROJECT_DIR = "/opt/airflow/dbt_project"
 
 
 def extract_and_write_parquet(**context):
@@ -58,7 +62,7 @@ def extract_and_write_parquet(**context):
     df.to_parquet(buffer, engine="pyarrow", index=False)
     buffer.seek(0)
 
-    # 4. Формируем ключ файла — пока без партиций, один файл на интервал
+    # 4. Формируем ключ файла с партиционированием по дате интервала
     year = data_interval_start.strftime("%Y")
     month = data_interval_start.strftime("%m")
     day = data_interval_start.strftime("%d")
@@ -84,15 +88,32 @@ default_args = {
 
 with DAG(
     dag_id="raw_extract_requests",
-    description="Extract requests for data_interval and write as Parquet to MinIO (Raw layer)",
+    description="Extract requests, transform via dbt, and export marts to Postgres for Metabase",
     default_args=default_args,
     schedule="@daily",
     start_date=datetime(2026, 7, 29),
     catchup=False,
-    tags=["extraction", "raw", "parquet"],
+    tags=["extraction", "raw", "parquet", "dbt"],
 ) as dag:
 
     extract_and_write_task = PythonOperator(
         task_id="extract_and_write_parquet",
         python_callable=extract_and_write_parquet,
     )
+
+    run_dbt = BashOperator(
+        task_id="run_dbt",
+        bash_command=f"cd {DBT_PROJECT_DIR} && dbt run",
+    )
+
+    test_dbt = BashOperator(
+        task_id="test_dbt",
+        bash_command=f"cd {DBT_PROJECT_DIR} && dbt test",
+    )
+
+    export_to_postgres = BashOperator(
+        task_id="export_to_postgres",
+        bash_command=f"cd {DBT_PROJECT_DIR} && python export_marts_to_postgres.py",
+    )
+
+    extract_and_write_task >> run_dbt >> test_dbt >> export_to_postgres

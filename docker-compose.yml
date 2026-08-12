@@ -1,7 +1,16 @@
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.9.3
+  build:
+    context: ./docker/airflow
+    dockerfile: Dockerfile
   restart: unless-stopped
   environment:
+    DBT_PROFILES_DIR: /opt/airflow/dbt-profiles
+    DBT_S3_ENDPOINT: minio:9000
+    MARTS_DB_HOST: marts-db
+    MARTS_DB_PORT: "5432"
+    MARTS_DB_USER: ${MARTS_DB_USER}
+    MARTS_DB_PASSWORD: ${MARTS_DB_PASSWORD}
+    MARTS_DB_NAME: ${MARTS_DB_NAME}
     MINIO_ENDPOINT: http://minio:9000
     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -19,6 +28,7 @@ x-airflow-common: &airflow-common
     SOURCE_DB_USER: ${SOURCE_DB_USER}
     SOURCE_DB_PASSWORD: ${SOURCE_DB_PASSWORD}
   volumes:
+    - ./docker/airflow/dbt-profiles:/opt/airflow/dbt-profiles
     - ./dags:/opt/airflow/dags
     - ./dbt_project:/opt/airflow/dbt_project
     - airflow_logs:/opt/airflow/logs
