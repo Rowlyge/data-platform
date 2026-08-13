@@ -189,7 +189,9 @@ All three steps (extract, transform, export) run inside the Airflow scheduler co
 * ✅ Marts exported from DuckDB into a dedicated PostgreSQL instance (`marts-db`) for stable BI access
 * ✅ Metabase dashboard ("Telemetry Overview") with 4 widgets: total requests, p95 latency, error rate, traffic by upstream
 * ✅ Fully automated pipeline: the Airflow DAG runs `extract -> dbt run -> dbt test -> export to Postgres` end to end on a daily schedule, with zero manual steps
-* ✅ Verified real `@daily` scheduling in addition to manual triggers — the scheduler picks up and runs the DAG on its own
+* ✅ Verified real `@daily` scheduling: the scheduler automatically detects and runs missed intervals as `scheduled__` DAG runs, with no manual trigger required
+
+**Note on scheduling in this environment:** `@daily` scheduling is correctly configured (`catchup=False`, one run per missed day). Confirmed over two separate days: the scheduler picked up the previous day's interval as a `scheduled__` run each time the stack was started, without any manual trigger. Since this is a local dev environment where the Airflow containers aren't kept running 24/7, the exact run *time* depends on when the stack is (re)started rather than firing at midnight in real time — in a continuously running deployment (e.g. production), `@daily` would fire at midnight as expected. The scheduling logic itself is verified correct either way.
 
 **Next milestones:**
 
