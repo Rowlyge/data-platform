@@ -18,6 +18,8 @@ from airflow.operators.python import PythonOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
+from utils.alerting import task_failure_alert
+
 POSTGRES_CONN_ID = "proxy_postgres"
 S3_CONN_ID = "minio_s3"
 BUCKET_NAME = "data-lake"
@@ -84,6 +86,7 @@ default_args = {
     "owner": "data-platform",
     "retries": 1,
     "retry_delay": timedelta(minutes=1),
+    "on_failure_callback": task_failure_alert,
 }
 
 with DAG(
