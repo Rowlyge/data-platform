@@ -173,6 +173,16 @@ All three steps (extract, transform, export) run inside the Airflow scheduler co
 
 ---
 
+## Observability
+
+**Checking pipeline status:**
+
+- **Airflow UI** (recommended): open http://localhost:8080, go to the `raw_extract_requests` DAG, and use the **Grid** view. Each run is color-coded (green = success, red = failed, yellow = running/retrying). Click any task box to view its logs directly.
+- **CLI**: `docker compose exec airflow-scheduler airflow dags list-runs -d raw_extract_requests` shows recent runs with their state, start, and end times — useful for a quick check without opening a browser.
+- **Failure alerts**: if a task fails after exhausting retries, a structured JSON entry is appended to `docker compose exec airflow-scheduler cat /opt/airflow/logs/alerts.log`, including the failing task, the data interval it was processing, the exception message, and a direct link to its logs.
+
+**What "healthy" looks like:** the most recent `raw_extract_requests` run should be `success`, meaning `extract_and_write_parquet -> run_dbt -> test_dbt -> export_to_postgres` all completed — fresh data is in MinIO, dbt tests passed, and marts-db (and therefore the Metabase dashboard) reflects the latest data.
+
 ## Current Status
 
 **Currently implemented:**
