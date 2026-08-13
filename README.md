@@ -193,10 +193,13 @@ All three steps (extract, transform, export) run inside the Airflow scheduler co
 
 **Note on scheduling in this environment:** `@daily` scheduling is correctly configured (`catchup=False`, one run per missed day). Confirmed over two separate days: the scheduler picked up the previous day's interval as a `scheduled__` run each time the stack was started, without any manual trigger. Since this is a local dev environment where the Airflow containers aren't kept running 24/7, the exact run *time* depends on when the stack is (re)started rather than firing at midnight in real time — in a continuously running deployment (e.g. production), `@daily` would fire at midnight as expected. The scheduling logic itself is verified correct either way.
 
+* ✅ Failure alerting: every task failure (after retries are exhausted) is written as a structured JSON entry to a dedicated `alerts.log`, including the DAG/task ID, data interval, exception message, and a direct link to the task logs — verified by triggering a real failure (bad DB credentials) and confirming the alert entry
+* ✅ Retry policy: each task retries once (1-minute delay) before being marked failed and triggering an alert
+
 **Next milestones:**
 
-* [ ] Retry policy and failure alerting for Airflow DAGs (currently a single retry with no notification on failure)
 * [ ] Backfill / historical load strategy documentation (`catchup` behavior)
+* [ ] Wire the alert log into a real notification channel (email/Slack) if this moves beyond local development
 
 ---
 
